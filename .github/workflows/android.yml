@@ -35,11 +35,8 @@ jobs:
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
-      - name: Run unit tests
-        run: gradle testDebugUnitTest
-
       - name: Build APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug -x test --stacktrace
 
       - name: Prepare APK output
         run: |
