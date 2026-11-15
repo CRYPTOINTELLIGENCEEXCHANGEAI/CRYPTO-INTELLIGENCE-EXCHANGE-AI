@@ -19,7 +19,11 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    buildConfigField("String", "APPS_SCRIPT_URL", "\"\"")
+    buildConfigField(
+      "String",
+      "APPS_SCRIPT_URL",
+      "\"https://script.google.com/macros/s/AKfycbyiZGVkX-XLI4hnhIIRcUJMM41EZsoc-c7yOuFxjtQHUqiZc8REXvdAqZMYXpffZN7I1A/exec\""
+    )
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
