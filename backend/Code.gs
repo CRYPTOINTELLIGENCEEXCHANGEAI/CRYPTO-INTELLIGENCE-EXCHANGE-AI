@@ -120,15 +120,17 @@ function doPost(e) {
 /* ==================== AUTHENTICATION ==================== */
 
 function handleLogin(body) {
-  const email = normalizeEmail(body.email);
+  const rawIdentifier = String(body.email || body.identifier || body.userId || '').trim();
+  const identifierLower = rawIdentifier.toLowerCase();
   const password = String(body.password || '');
-  if (!email || !password) {
-    return jsonResponse(false, 'Email and password are required.');
+  if (!identifierLower || !password) {
+    return jsonResponse(false, 'Email/User ID and password are required.');
   }
 
-  const found = findRowByColumn('Users', 'Email', email, true);
+  const found = findRowByColumn('Users', 'Email', identifierLower, true)
+    || findRowByColumn('Users', 'User ID', rawIdentifier, true);
   if (!found) {
-    return jsonResponse(false, 'No account found with this email.');
+    return jsonResponse(false, 'No account found with this Email or User ID.');
   }
 
   const storedPassword = String(found.record['Password'] || '');
@@ -137,7 +139,8 @@ function handleLogin(body) {
   }
 
   const sanitized = sanitizeUser(found.record);
-  sanitized.isAdmin = (email === ADMIN_EMAIL);
+  const resolvedEmail = normalizeEmail(found.record['Email']);
+  sanitized.isAdmin = (resolvedEmail === ADMIN_EMAIL);
   return jsonResponse(true, 'Login successful', sanitized);
 }
 

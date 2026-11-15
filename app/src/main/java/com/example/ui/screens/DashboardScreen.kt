@@ -51,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.example.data.model.UserPlan
 import com.example.data.model.UserProfile
 import com.example.ui.components.EmptyStateCard
@@ -92,6 +94,17 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (user.photoUrl.startsWith("http")) {
+                        AsyncImage(
+                            model = user.photoUrl,
+                            contentDescription = "Profile photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Hello, ${user.name.ifBlank { "Investor" }}",

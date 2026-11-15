@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
@@ -86,6 +87,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 } else {
+                    val currentAuth = _uiState.value.authState
+                    if (currentAuth is AuthUiState.Authenticated &&
+                        currentAuth.user.email.equals(savedEmail, ignoreCase = true)
+                    ) {
+                        return@collectLatest
+                    }
                     restoreUserSession(savedEmail)
                 }
             }
@@ -140,25 +147,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            repository.login(email, password)
-                .onSuccess { user ->
-                    _uiState.update {
-                        it.copy(
-                            authState = AuthUiState.Authenticated(user),
-                            isLoading = false,
-                            message = "Welcome back, ${user.name.ifBlank { user.email }}"
-                        )
+            try {
+                Log.d("MainViewModel", "login() called for email=$email, url=${_uiState.value.appsScriptUrl}")
+                repository.login(email, password)
+                    .onSuccess { user ->
+                        _uiState.update {
+                            it.copy(
+                                authState = AuthUiState.Authenticated(user),
+                                isLoading = false,
+                                message = "Welcome back, ${user.name.ifBlank { user.email }}"
+                            )
+                        }
+                        refreshAllData(user)
                     }
-                    refreshAllData(user)
-                }
-                .onFailure { err ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = err.message ?: "Login failed."
-                        )
+                    .onFailure { err ->
+                        Log.e("MainViewModel", "login() error: ${err.message}", err)
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = err.message ?: "Login failed."
+                            )
+                        }
                     }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "login() unexpected exception: ${e.message}", e)
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "${e::class.java.simpleName}: ${e.message ?: "Unexpected login error"}"
+                    )
                 }
+            }
         }
     }
 
@@ -171,7 +190,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         it.copy(
                             authState = AuthUiState.Authenticated(user),
                             isLoading = false,
-                            message = "Account created! Welcome to MyFund Global."
+                            message = "Account created! Welcome to Crypto Intelligence Exchange AI."
                         )
                     }
                     refreshAllData(user)

@@ -221,7 +221,14 @@ fun MyFundApp(
                     snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                     topBar = {
                         TopAppBar(
-                            title = { Text("MyFund Global") },
+                            title = {
+                                Text(
+                                    text = "Crypto Intelligence Exchange AI",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.background
                             ),

@@ -80,6 +80,7 @@ data class AppVersionInfo(
 data class ApiResponse<T>(
     @Json(name = "success") val success: Boolean = false,
     @Json(name = "message") val message: String = "",
+    @Json(name = "error") val error: String = "",
     @Json(name = "data") val data: T? = null
 )
 
@@ -87,6 +88,8 @@ data class ApiResponse<T>(
 data class LoginRequest(
     val action: String = "login",
     val email: String,
+    val identifier: String = email,
+    val userId: String = email,
     val password: String
 )
 

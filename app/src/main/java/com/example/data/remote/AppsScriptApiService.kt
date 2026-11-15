@@ -1,25 +1,21 @@
 package com.example.data.remote
 
-import com.example.data.model.ApiResponse
-import com.example.data.model.AppVersionInfo
 import com.example.data.model.LoginRequest
 import com.example.data.model.SignupRequest
 import com.example.data.model.SubmitKycRequest
 import com.example.data.model.SubmitTransactionRequest
-import com.example.data.model.TransactionRecord
 import com.example.data.model.UpdateKycStatusRequest
 import com.example.data.model.UpdateTransactionStatusRequest
 import com.example.data.model.UpdateUserBalanceRequest
-import com.example.data.model.UserPlan
-import com.example.data.model.UserProfile
-import com.example.data.model.VerificationRecord
 import com.squareup.moshi.FromJson
 import com.squareup.moshi.JsonReader
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.ToJson
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
@@ -80,14 +76,14 @@ interface AppsScriptApiService {
     suspend fun checkVersion(
         @Url url: String,
         @Query("action") action: String = "checkVersion"
-    ): ApiResponse<AppVersionInfo>
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getUser(
         @Url url: String,
         @Query("action") action: String = "getUser",
         @Query("email") email: String
-    ): ApiResponse<UserProfile>
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getTransactions(
@@ -96,75 +92,75 @@ interface AppsScriptApiService {
         @Query("email") email: String? = null,
         @Query("adminEmail") adminEmail: String? = null,
         @Query("status") status: String? = null
-    ): ApiResponse<List<TransactionRecord>>
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getUserPlans(
         @Url url: String,
         @Query("action") action: String = "getUserPlans",
         @Query("email") email: String
-    ): ApiResponse<List<UserPlan>>
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getPendingVerifications(
         @Url url: String,
         @Query("action") action: String = "getPendingVerifications",
         @Query("adminEmail") adminEmail: String
-    ): ApiResponse<List<VerificationRecord>>
+    ): Response<ResponseBody>
 
     @GET
     suspend fun getAllUsers(
         @Url url: String,
         @Query("action") action: String = "getAllUsers",
         @Query("adminEmail") adminEmail: String
-    ): ApiResponse<List<UserProfile>>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun login(
         @Url url: String,
         @Body request: LoginRequest
-    ): ApiResponse<UserProfile>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun signup(
         @Url url: String,
         @Body request: SignupRequest
-    ): ApiResponse<UserProfile>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun submitTransaction(
         @Url url: String,
         @Body request: SubmitTransactionRequest
-    ): ApiResponse<TransactionRecord>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun submitKyc(
         @Url url: String,
         @Body request: SubmitKycRequest
-    ): ApiResponse<VerificationRecord>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun updateTransactionStatus(
         @Url url: String,
         @Body request: UpdateTransactionStatusRequest
-    ): ApiResponse<Map<String, Any>>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun updateKycStatus(
         @Url url: String,
         @Body request: UpdateKycStatusRequest
-    ): ApiResponse<Any>
+    ): Response<ResponseBody>
 
     @POST
     suspend fun updateUserBalance(
         @Url url: String,
         @Body request: UpdateUserBalanceRequest
-    ): ApiResponse<Any>
+    ): Response<ResponseBody>
 }
 
 object NetworkClient {
 
-    private val moshi: Moshi = Moshi.Builder()
+    val moshi: Moshi = Moshi.Builder()
         .add(SafeDoubleAdapter())
         .add(SafeIntAdapter())
         .addLast(KotlinJsonAdapterFactory())
@@ -178,7 +174,7 @@ object NetworkClient {
         .writeTimeout(45, TimeUnit.SECONDS)
         .addInterceptor(
             HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
+                level = HttpLoggingInterceptor.Level.BODY
             }
         )
         .build()

@@ -1,6 +1,6 @@
 {
-  "name": "MyFund Global",
-  "description": "Full-stack wealth & investment tracker powered by Google Sheets & Apps Script with user dashboard, deposits, withdrawals, KYC verification, and admin management.",
+  "name": "Crypto Intelligence Exchange",
+  "description": "Crypto Intelligence Exchange AI — Full-stack wealth & investment tracker powered by Google Sheets & Apps Script with user dashboard, deposits, withdrawals, KYC verification, and admin management.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

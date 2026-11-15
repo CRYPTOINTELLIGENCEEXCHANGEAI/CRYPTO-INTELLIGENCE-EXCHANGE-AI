@@ -153,7 +153,7 @@ fun AuthScreen(
                         shape = RoundedCornerShape(50)
                     ) {
                         Text(
-                            text = "MYFUND GLOBAL",
+                            text = "CRYPTO INTELLIGENCE EXCHANGE AI",
                             color = GoldChampagne,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
@@ -278,7 +278,7 @@ fun AuthScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = { Text("Email Address") },
+                    label = { Text(if (isSignupMode) "Email Address" else "Email or User ID") },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     singleLine = true,

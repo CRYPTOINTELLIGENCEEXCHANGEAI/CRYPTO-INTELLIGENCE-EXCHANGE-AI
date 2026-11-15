@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "MyFund Global"
+rootProject.name = "Crypto Intelligence Exchange"
 
 include(":app")
