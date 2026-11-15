@@ -22,4 +22,4 @@ Create a Google Spreadsheet with the following 5 tabs (or paste `backend/Code.gs
 Log in or sign up with `myfundglobal@gmail.com` to automatically unlock the **Admin** tab for managing pending Transactions, KYC Verifications, and User Balances.
 
 ## 4. GitHub Actions CI/CD
-Push to `main` to trigger `.github/workflows/android.yml`, which builds the APK and attaches `app-release.apk` to GitHub Releases. Add `KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD` to GitHub Repository Secrets for signed release builds.
+Push to `main` (or trigger manually via `workflow_dispatch`) to run `.github/workflows/android.yml`, which runs unit tests, builds `MyFundGlobal-debug.apk` without requiring any GitHub secrets, and attaches it as both a workflow artifact and a GitHub Release.
