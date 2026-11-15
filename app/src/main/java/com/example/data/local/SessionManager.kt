@@ -1,53 +1,93 @@
 package com.example.data.local
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import com.example.BuildConfig
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKeys
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "myfund_session")
+data class SavedCredentials(
+    val username: String,
+    val password: String
+)
 
-class SessionManager(private val context: Context) {
+data class ProfileOverride(
+    val name: String,
+    val phone: String,
+    val photoPath: String
+)
+
+class SessionManager(context: Context) {
 
     companion object {
-        private val KEY_USER_EMAIL = stringPreferencesKey("user_email")
-        private val KEY_APPS_SCRIPT_URL = stringPreferencesKey("apps_script_url")
+        private const val PREF_NAME = "myfund_encrypted_session"
+        private const val KEY_USERNAME = "saved_username"
+        private const val KEY_PASSWORD = "saved_password"
+        private const val PREFIX_OVERRIDE_NAME = "profile_name_"
+        private const val PREFIX_OVERRIDE_PHONE = "profile_phone_"
+        private const val PREFIX_OVERRIDE_PHOTO = "profile_photo_"
     }
 
-    val loggedInEmailFlow: Flow<String?> = context.dataStore.data.map { prefs ->
-        prefs[KEY_USER_EMAIL]?.takeIf { it.isNotBlank() }
-    }
+    private val prefs: SharedPreferences = createEncryptedPrefs(context.applicationContext)
 
-    val appsScriptUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        val saved = prefs[KEY_APPS_SCRIPT_URL]?.trim().orEmpty()
-        saved.ifBlank { BuildConfig.APPS_SCRIPT_URL.trim() }
-    }
-
-    suspend fun getAppsScriptUrl(): String {
-        return appsScriptUrlFlow.first()
-    }
-
-    suspend fun saveUserEmail(email: String) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_USER_EMAIL] = email.trim().lowercase()
+    private fun createEncryptedPrefs(context: Context): SharedPreferences {
+        return try {
+            val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+            EncryptedSharedPreferences.create(
+                PREF_NAME,
+                masterKeyAlias,
+                context,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.w("SessionManager", "EncryptedSharedPreferences fallback: ${e.message}")
+            context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         }
     }
 
-    suspend fun saveAppsScriptUrl(url: String) {
-        context.dataStore.edit { prefs ->
-            prefs[KEY_APPS_SCRIPT_URL] = url.trim()
-        }
+    fun getSavedCredentials(): SavedCredentials? {
+        val username = prefs.getString(KEY_USERNAME, null)?.trim().orEmpty()
+        val password = prefs.getString(KEY_PASSWORD, null).orEmpty()
+        if (username.isEmpty() || password.isEmpty()) return null
+        return SavedCredentials(username = username, password = password)
     }
 
-    suspend fun clearSession() {
-        context.dataStore.edit { prefs ->
-            prefs.remove(KEY_USER_EMAIL)
-        }
+    fun saveCredentials(username: String, password: String) {
+        prefs.edit()
+            .putString(KEY_USERNAME, username.trim())
+            .putString(KEY_PASSWORD, password)
+            .apply()
+    }
+
+    fun clearSession() {
+        prefs.edit()
+            .remove(KEY_USERNAME)
+            .remove(KEY_PASSWORD)
+            .apply()
+    }
+
+    private fun safeKey(rawKey: String): String {
+        return rawKey.trim().lowercase().replace(Regex("[^a-z0-9_]"), "_")
+    }
+
+    fun saveProfileOverride(userKey: String, name: String, phone: String, photoPath: String) {
+        val key = safeKey(userKey)
+        if (key.isBlank()) return
+        prefs.edit()
+            .putString(PREFIX_OVERRIDE_NAME + key, name.trim())
+            .putString(PREFIX_OVERRIDE_PHONE + key, phone.trim())
+            .putString(PREFIX_OVERRIDE_PHOTO + key, photoPath.trim())
+            .apply()
+    }
+
+    fun getProfileOverride(userKey: String): ProfileOverride? {
+        val key = safeKey(userKey)
+        if (key.isBlank()) return null
+        val name = prefs.getString(PREFIX_OVERRIDE_NAME + key, null).orEmpty()
+        val phone = prefs.getString(PREFIX_OVERRIDE_PHONE + key, null).orEmpty()
+        val photo = prefs.getString(PREFIX_OVERRIDE_PHOTO + key, null).orEmpty()
+        if (name.isBlank() && phone.isBlank() && photo.isBlank()) return null
+        return ProfileOverride(name = name, phone = phone, photoPath = photo)
     }
 }

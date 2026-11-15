@@ -1,7 +1,5 @@
 package com.example.ui
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -10,20 +8,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SettingsEthernet
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.VerifiedUser
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,14 +38,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -57,23 +55,33 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.ui.components.EndpointConfigDialog
-import com.example.ui.components.UpdatePromptDialog
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.DashboardScreen
-import com.example.ui.screens.DepositWithdrawScreen
+import com.example.ui.screens.DepositScreen
 import com.example.ui.screens.HistoryScreen
 import com.example.ui.screens.KycScreen
+import com.example.ui.screens.MyPlansScreen
+import com.example.ui.screens.NotificationsScreen
+import com.example.ui.screens.OtpVerificationScreen
+import com.example.ui.screens.PlansScreen
+import com.example.ui.screens.ProfileScreen
+import com.example.ui.screens.SplashScreen
+import com.example.ui.screens.WithdrawScreen
 import com.example.ui.viewmodel.AuthUiState
 import com.example.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 object AppRoutes {
-    const val DASHBOARD = "dashboard"
-    const val TRANSFER_DEPOSIT = "transfer/deposit"
-    const val TRANSFER_WITHDRAW = "transfer/withdraw"
-    const val KYC = "kyc"
+    const val HOME = "home"
+    const val PLANS = "plans"
+    const val MY_PLANS = "my_plans"
     const val HISTORY = "history"
+    const val PROFILE = "profile"
+    const val DEPOSIT = "deposit"
+    const val WITHDRAW = "withdraw"
+    const val KYC = "kyc"
+    const val NOTIFICATIONS = "notifications"
     const val ADMIN = "admin"
 }
 
@@ -92,124 +100,117 @@ fun MyFundApp(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    var showEndpointDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(uiState.message, uiState.errorMessage) {
-        val msg = uiState.message ?: uiState.errorMessage
-        if (!msg.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(msg)
-            viewModel.clearBannerMessages()
+    var prefillDepositPlan by remember { mutableStateOf("") }
+    var prefillDepositAmount by remember { mutableDoubleStateOf(0.0) }
+
+    LaunchedEffect(uiState.authState, uiState.message, uiState.errorMessage) {
+        if (uiState.authState is AuthUiState.Authenticated) {
+            val msg = uiState.message ?: uiState.errorMessage
+            if (!msg.isNullOrBlank()) {
+                snackbarHostState.showSnackbar(msg)
+                viewModel.clearMessages()
+            }
         }
-    }
-
-    if (uiState.availableUpdate != null) {
-        val info = uiState.availableUpdate!!
-        UpdatePromptDialog(
-            versionInfo = info,
-            onUpdateNow = { url ->
-                if (url.startsWith("http")) {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
-            },
-            onDismiss = { viewModel.dismissUpdateDialog() }
-        )
-    }
-
-    if (showEndpointDialog) {
-        EndpointConfigDialog(
-            currentUrl = uiState.appsScriptUrl,
-            onSave = { viewModel.saveAppsScriptUrl(it) },
-            onDismiss = { showEndpointDialog = false }
-        )
     }
 
     when (val auth = uiState.authState) {
-        AuthUiState.CheckingSession -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+        AuthUiState.Splash -> {
+            SplashScreen()
         }
 
         AuthUiState.Unauthenticated -> {
-            AuthScreen(
-                appsScriptUrl = uiState.appsScriptUrl,
-                isLoading = uiState.isLoading,
-                errorMessage = uiState.errorMessage,
-                onLogin = { email, pass -> viewModel.login(email, pass) },
-                onSignup = { name, email, phone, pass, ref ->
-                    viewModel.signup(name, email, phone, pass, ref)
-                },
-                onSaveEndpointUrl = { viewModel.saveAppsScriptUrl(it) }
-            )
+            val pending = uiState.pendingSignup
+            if (pending != null) {
+                OtpVerificationScreen(
+                    email = pending.email,
+                    isLoading = uiState.isLoading,
+                    errorMessage = uiState.errorMessage,
+                    successMessage = uiState.message,
+                    onVerifyOtp = { otp ->
+                        viewModel.verifyOtpAndRegister(otp) {
+                            // PendingSignup cleared -> transitions back to Login automatically
+                        }
+                    },
+                    onResendOtp = {
+                        viewModel.resendSignupOtp {}
+                    },
+                    onBack = { viewModel.cancelOtpScreen() }
+                )
+            } else {
+                AuthScreen(
+                    isLoading = uiState.isLoading,
+                    errorMessage = uiState.errorMessage,
+                    successMessage = uiState.message,
+                    onLogin = { username, pass -> viewModel.login(username, pass) },
+                    onStartSignup = { name, surname, email, phone, pass, ref ->
+                        viewModel.startSignupAndSendOtp(name, surname, email, phone, pass, ref) {}
+                    }
+                )
+            }
         }
 
         is AuthUiState.Authenticated -> {
             val user = auth.user
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = backStackEntry?.destination?.route ?: AppRoutes.DASHBOARD
+            val currentRoute = backStackEntry?.destination?.route ?: AppRoutes.HOME
 
-            val destinations = buildList {
-                add(
-                    NavDestination(
-                        route = AppRoutes.DASHBOARD,
-                        label = "Home",
-                        selectedIcon = Icons.Filled.Dashboard,
-                        unselectedIcon = Icons.Outlined.Dashboard,
-                        tag = "nav_dashboard"
-                    )
+            val topLevelDestinations = listOf(
+                NavDestination(
+                    route = AppRoutes.HOME,
+                    label = "Home",
+                    selectedIcon = Icons.Filled.Dashboard,
+                    unselectedIcon = Icons.Outlined.Dashboard,
+                    tag = "nav_home"
+                ),
+                NavDestination(
+                    route = AppRoutes.PLANS,
+                    label = "Plans",
+                    selectedIcon = Icons.Filled.WorkspacePremium,
+                    unselectedIcon = Icons.Outlined.WorkspacePremium,
+                    tag = "nav_plans"
+                ),
+                NavDestination(
+                    route = AppRoutes.MY_PLANS,
+                    label = "My Plans",
+                    selectedIcon = Icons.AutoMirrored.Filled.TrendingUp,
+                    unselectedIcon = Icons.AutoMirrored.Filled.TrendingUp,
+                    tag = "nav_my_plans"
+                ),
+                NavDestination(
+                    route = AppRoutes.HISTORY,
+                    label = "History",
+                    selectedIcon = Icons.Filled.History,
+                    unselectedIcon = Icons.Outlined.History,
+                    tag = "nav_history"
+                ),
+                NavDestination(
+                    route = AppRoutes.PROFILE,
+                    label = "Profile",
+                    selectedIcon = Icons.Filled.Person,
+                    unselectedIcon = Icons.Outlined.Person,
+                    tag = "nav_profile"
                 )
-                add(
-                    NavDestination(
-                        route = AppRoutes.TRANSFER_DEPOSIT,
-                        label = "Transact",
-                        selectedIcon = Icons.Filled.SwapHoriz,
-                        unselectedIcon = Icons.Outlined.SwapHoriz,
-                        tag = "nav_transfer"
-                    )
-                )
-                add(
-                    NavDestination(
-                        route = AppRoutes.KYC,
-                        label = "KYC",
-                        selectedIcon = Icons.Filled.VerifiedUser,
-                        unselectedIcon = Icons.Outlined.VerifiedUser,
-                        tag = "nav_kyc"
-                    )
-                )
-                add(
-                    NavDestination(
-                        route = AppRoutes.HISTORY,
-                        label = "History",
-                        selectedIcon = Icons.Filled.History,
-                        unselectedIcon = Icons.Outlined.History,
-                        tag = "nav_history"
-                    )
-                )
-                if (user.computedIsAdmin) {
-                    add(
-                        NavDestination(
-                            route = AppRoutes.ADMIN,
-                            label = "Admin",
-                            selectedIcon = Icons.Filled.AdminPanelSettings,
-                            unselectedIcon = Icons.Outlined.AdminPanelSettings,
-                            tag = "nav_admin"
-                        )
-                    )
-                }
-            }
+            )
 
-            fun navigateSingleTop(route: String) {
+            val topLevelRoutes = topLevelDestinations.map { it.route }.toSet()
+            val isTopLevel = currentRoute in topLevelRoutes
+
+            fun navigateTab(route: String) {
                 navController.navigate(route) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
                     }
                     launchSingleTop = true
                     restoreState = true
+                }
+            }
+
+            fun openSecondary(route: String) {
+                navController.navigate(route) {
+                    launchSingleTop = true
                 }
             }
 
@@ -220,69 +221,75 @@ fun MyFundApp(
                     contentWindowInsets = WindowInsets.safeDrawing,
                     snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                     topBar = {
-                        TopAppBar(
-                            title = {
-                                Text(
-                                    text = "Crypto Intelligence Exchange AI",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                )
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.background
-                            ),
-                            actions = {
-                                IconButton(
-                                    onClick = { viewModel.refreshCurrentUser() },
-                                    modifier = Modifier.testTag("topbar_refresh_button")
-                                ) {
-                                    if (uiState.isRefreshing) {
-                                        CircularProgressIndicator(strokeWidth = 2.dp)
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = "Refresh Google Sheet data"
-                                        )
+                        if (currentRoute != AppRoutes.ADMIN) {
+                            TopAppBar(
+                                title = {
+                                    Text(
+                                        text = when (currentRoute) {
+                                            AppRoutes.DEPOSIT -> "Deposit"
+                                            AppRoutes.WITHDRAW -> "Withdraw"
+                                            AppRoutes.KYC -> "KYC Verification"
+                                            AppRoutes.NOTIFICATIONS -> "Notifications"
+                                            else -> "Crypto Intelligence Exchange AI"
+                                        },
+                                        style = MaterialTheme.typography.titleLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                navigationIcon = {
+                                    if (!isTopLevel) {
+                                        IconButton(onClick = { navController.popBackStack() }) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                                contentDescription = "Back"
+                                            )
+                                        }
                                     }
-                                }
-                                IconButton(
-                                    onClick = { showEndpointDialog = true },
-                                    modifier = Modifier.testTag("topbar_endpoint_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SettingsEthernet,
-                                        contentDescription = "Configure Google Apps Script URL"
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.logout() },
-                                    modifier = Modifier.testTag("topbar_logout_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Logout,
-                                        contentDescription = "Sign Out"
-                                    )
-                                }
-                            }
-                        )
+                                },
+                                actions = {
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.refreshNotifications()
+                                            openSecondary(AppRoutes.NOTIFICATIONS)
+                                        },
+                                        modifier = Modifier.testTag("topbar_notifications_button")
+                                    ) {
+                                        BadgedBox(
+                                            badge = {
+                                                if (uiState.notifications.isNotEmpty()) {
+                                                    Badge { Text(uiState.notifications.size.toString()) }
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Notifications,
+                                                contentDescription = "Notifications"
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.background
+                                )
+                            )
+                        }
                     },
                     bottomBar = {
-                        if (!useNavRail) {
+                        if (!useNavRail && isTopLevel) {
                             NavigationBar {
-                                destinations.forEach { dest ->
-                                    val selected = currentRoute == dest.route ||
-                                        (dest.route == AppRoutes.TRANSFER_DEPOSIT && currentRoute == AppRoutes.TRANSFER_WITHDRAW)
+                                topLevelDestinations.forEach { dest ->
+                                    val selected = currentRoute == dest.route
                                     NavigationBarItem(
                                         selected = selected,
-                                        onClick = { navigateSingleTop(dest.route) },
+                                        onClick = { navigateTab(dest.route) },
                                         icon = {
                                             Icon(
                                                 imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
                                                 contentDescription = dest.label
                                             )
                                         },
-                                        label = { Text(dest.label) },
+                                        label = { Text(dest.label, maxLines = 1) },
                                         modifier = Modifier.testTag(dest.tag)
                                     )
                                 }
@@ -295,14 +302,13 @@ fun MyFundApp(
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
-                        if (useNavRail) {
+                        if (useNavRail && isTopLevel) {
                             NavigationRail {
-                                destinations.forEach { dest ->
-                                    val selected = currentRoute == dest.route ||
-                                        (dest.route == AppRoutes.TRANSFER_DEPOSIT && currentRoute == AppRoutes.TRANSFER_WITHDRAW)
+                                topLevelDestinations.forEach { dest ->
+                                    val selected = currentRoute == dest.route
                                     NavigationRailItem(
                                         selected = selected,
-                                        onClick = { navigateSingleTop(dest.route) },
+                                        onClick = { navigateTab(dest.route) },
                                         icon = {
                                             Icon(
                                                 imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -318,43 +324,102 @@ fun MyFundApp(
 
                         NavHost(
                             navController = navController,
-                            startDestination = AppRoutes.DASHBOARD,
+                            startDestination = AppRoutes.HOME,
                             modifier = Modifier.weight(1f)
                         ) {
-                            composable(AppRoutes.DASHBOARD) {
+                            composable(AppRoutes.HOME) {
                                 DashboardScreen(
                                     user = user,
-                                    plans = uiState.userPlans,
-                                    onNavigateToTransfer = { isDeposit ->
-                                        navigateSingleTop(
-                                            if (isDeposit) AppRoutes.TRANSFER_DEPOSIT
-                                            else AppRoutes.TRANSFER_WITHDRAW
-                                        )
+                                    userPlans = uiState.userPlans,
+                                    plansInfo = uiState.plansInfo,
+                                    isRefreshing = uiState.isRefreshing,
+                                    isSubmitting = uiState.isSubmitting,
+                                    onRefresh = { viewModel.refreshHome() },
+                                    onUpdateProfile = { name, phone, uri, onDone ->
+                                        viewModel.updateProfile(name, phone, uri, onDone)
                                     },
-                                    onNavigateToKyc = { navigateSingleTop(AppRoutes.KYC) },
-                                    onNavigateToHistory = { navigateSingleTop(AppRoutes.HISTORY) },
-                                    onNavigateToAdmin = { navigateSingleTop(AppRoutes.ADMIN) }
+                                    onNavigateToDeposit = {
+                                        prefillDepositPlan = ""
+                                        prefillDepositAmount = 0.0
+                                        openSecondary(AppRoutes.DEPOSIT)
+                                    },
+                                    onNavigateToWithdraw = { openSecondary(AppRoutes.WITHDRAW) },
+                                    onNavigateToKyc = { openSecondary(AppRoutes.KYC) },
+                                    onNavigateToHistory = { navigateTab(AppRoutes.HISTORY) },
+                                    onNavigateToMyPlans = { navigateTab(AppRoutes.MY_PLANS) }
                                 )
                             }
 
-                            composable(AppRoutes.TRANSFER_DEPOSIT) {
-                                DepositWithdrawScreen(
+                            composable(AppRoutes.PLANS) {
+                                PlansScreen(
                                     user = user,
-                                    initialIsDeposit = true,
+                                    plansInfo = uiState.plansInfo,
                                     isSubmitting = uiState.isSubmitting,
-                                    onSubmit = { type, amount, details, proofUri, onDone ->
-                                        viewModel.submitTransaction(type, amount, details, proofUri, onDone)
+                                    onActivateFromBalance = { plan ->
+                                        viewModel.activatePlan(plan.name, plan.amount) {
+                                            navigateTab(AppRoutes.MY_PLANS)
+                                        }
+                                    },
+                                    onDepositAndActivate = { plan ->
+                                        prefillDepositPlan = plan.name
+                                        prefillDepositAmount = plan.amount
+                                        openSecondary(AppRoutes.DEPOSIT)
                                     }
                                 )
                             }
 
-                            composable(AppRoutes.TRANSFER_WITHDRAW) {
-                                DepositWithdrawScreen(
+                            composable(AppRoutes.MY_PLANS) {
+                                MyPlansScreen(
+                                    userPlans = uiState.userPlans,
+                                    plansInfo = uiState.plansInfo,
+                                    history = uiState.history
+                                )
+                            }
+
+                            composable(AppRoutes.HISTORY) {
+                                HistoryScreen(history = uiState.history)
+                            }
+
+                            composable(AppRoutes.PROFILE) {
+                                ProfileScreen(
                                     user = user,
-                                    initialIsDeposit = false,
                                     isSubmitting = uiState.isSubmitting,
-                                    onSubmit = { type, amount, details, proofUri, onDone ->
-                                        viewModel.submitTransaction(type, amount, details, proofUri, onDone)
+                                    onUpdateProfile = { name, phone, uri, onDone ->
+                                        viewModel.updateProfile(name, phone, uri, onDone)
+                                    },
+                                    onChangePassword = { oldPass, newPass, onDone ->
+                                        viewModel.changePassword(oldPass, newPass, onDone)
+                                    },
+                                    onOpenAdminPanel = {
+                                        openSecondary(AppRoutes.ADMIN)
+                                    },
+                                    onLogout = { viewModel.logout() }
+                                )
+                            }
+
+                            composable(AppRoutes.DEPOSIT) {
+                                DepositScreen(
+                                    appSettings = uiState.appSettings,
+                                    prefillPlanName = prefillDepositPlan,
+                                    prefillAmount = prefillDepositAmount,
+                                    isSubmitting = uiState.isSubmitting,
+                                    onShowMessage = { text ->
+                                        coroutineScope.launch { snackbarHostState.showSnackbar(text) }
+                                    },
+                                    onSubmitDeposit = { amt, txnId, method, planName, uri, onDone ->
+                                        viewModel.submitDeposit(amt, txnId, method, planName, uri, onDone)
+                                    }
+                                )
+                            }
+
+                            composable(AppRoutes.WITHDRAW) {
+                                WithdrawScreen(
+                                    user = user,
+                                    appSettings = uiState.appSettings,
+                                    isSubmitting = uiState.isSubmitting,
+                                    onNavigateToKyc = { openSecondary(AppRoutes.KYC) },
+                                    onSubmitWithdrawal = { amt, details, method, onDone ->
+                                        viewModel.submitWithdrawal(amt, details, method, onDone)
                                     }
                                 )
                             }
@@ -364,44 +429,42 @@ fun MyFundApp(
                                     user = user,
                                     isSubmitting = uiState.isSubmitting,
                                     onSubmitKyc = { pan, front, back, selfie, onDone ->
-                                        viewModel.submitKyc(pan, front, back, selfie, onDone)
+                                        viewModel.submitKYC(pan, front, back, selfie, onDone)
                                     }
                                 )
                             }
 
-                            composable(AppRoutes.HISTORY) {
-                                HistoryScreen(transactions = uiState.transactions)
+                            composable(AppRoutes.NOTIFICATIONS) {
+                                NotificationsScreen(notifications = uiState.notifications)
                             }
 
                             composable(AppRoutes.ADMIN) {
                                 AdminScreen(
-                                    transactions = uiState.adminTransactions,
-                                    verifications = uiState.adminVerifications,
-                                    users = uiState.adminUsers,
+                                    isUnlocked = uiState.isAdminUnlocked,
+                                    isLoading = uiState.isLoading,
+                                    isRefreshing = uiState.isRefreshing,
                                     isSubmitting = uiState.isSubmitting,
-                                    onApproveTransaction = { row ->
-                                        viewModel.updateTransactionStatus(row, "Success")
+                                    dashboard = uiState.adminDashboard,
+                                    users = uiState.adminUsers,
+                                    usersWithPlans = uiState.adminUsersWithPlans,
+                                    stats = uiState.adminStats,
+                                    onAdminLogin = { id, pass -> viewModel.adminLogin(id, pass) },
+                                    onRefreshAdmin = { viewModel.refreshAdminData() },
+                                    onFetchStats = { start, end -> viewModel.fetchAdminStats(start, end) },
+                                    onAdminAction = { type, id, act, email, amt ->
+                                        viewModel.performAdminAction(type, id, act, email, amt)
                                     },
-                                    onRejectTransaction = { row ->
-                                        viewModel.updateTransactionStatus(row, "Rejected")
+                                    onPayReturn = { uid, planId ->
+                                        viewModel.adminPayReturn(uid, planId)
                                     },
-                                    onApproveKyc = { targetEmail ->
-                                        viewModel.updateKycStatus(targetEmail, "Verified")
+                                    onManualCredit = { uid, amt, type, onDone ->
+                                        viewModel.adminCredit(uid, amt, type, onDone)
                                     },
-                                    onRejectKyc = { targetEmail ->
-                                        viewModel.updateKycStatus(targetEmail, "Rejected")
+                                    onSendNotify = { uid, title, msg, onDone ->
+                                        viewModel.adminNotify(uid, title, msg, onDone)
                                     },
-                                    onUpdateUserBalance = { email, inv, tot, lim, intRate, note, onDone ->
-                                        viewModel.updateUserBalance(
-                                            targetEmail = email,
-                                            invested = inv,
-                                            totalAmount = tot,
-                                            withdrawableLimit = lim,
-                                            interestRate = intRate,
-                                            notification = note,
-                                            onSuccess = onDone
-                                        )
-                                    }
+                                    onBack = { navController.popBackStack() },
+                                    onLockAdmin = { viewModel.lockAdminSession() }
                                 )
                             }
                         }

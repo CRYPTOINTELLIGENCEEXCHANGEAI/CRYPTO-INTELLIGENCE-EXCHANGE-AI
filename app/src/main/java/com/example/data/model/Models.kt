@@ -1,157 +1,126 @@
 package com.example.data.model
 
-import com.squareup.moshi.Json
-import com.squareup.moshi.JsonClass
-
 const val ADMIN_EMAIL = "myfundglobal@gmail.com"
 
-@JsonClass(generateAdapter = true)
 data class UserProfile(
-    @Json(name = "Email") val email: String = "",
-    @Json(name = "Name") val name: String = "",
-    @Json(name = "Invested") val invested: Double = 0.0,
-    @Json(name = "Total Withdrawal") val totalWithdrawal: Double = 0.0,
-    @Json(name = "Interest (%)") val interestRate: Double = 0.0,
-    @Json(name = "Withdrawable Limit") val withdrawableLimit: Double = 0.0,
-    @Json(name = "Phone") val phone: String = "",
-    @Json(name = "User ID") val userId: String = "",
-    @Json(name = "PhotoURL") val photoUrl: String = "",
-    @Json(name = "Total Amount") val totalAmount: Double = 0.0,
-    @Json(name = "Status") val status: String = "Unverified",
-    @Json(name = "Notification") val notification: String = "",
-    @Json(name = "ReferredBy") val referredBy: String = "",
-    @Json(name = "Terms_Consent_Date") val termsConsentDate: String = "",
-    @Json(name = "isAdmin") val isAdmin: Boolean = false,
-    @Json(name = "_rowNumber") val rowNumber: Int = 0
+    val email: String = "",
+    val name: String = "",
+    val invested: Double = 0.0,
+    val totalWithdrawal: Double = 0.0,
+    val interestRate: Double = 0.0,
+    val withdrawableLimit: Double = 0.0,
+    val phone: String = "",
+    val userId: String = "",
+    val photoUrl: String = "",
+    val totalAmount: Double = 0.0,
+    val status: String = "Not Verified"
 ) {
-    val computedIsAdmin: Boolean
-        get() = isAdmin || email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
+    val isAdminEligible: Boolean
+        get() = email.trim().equals(ADMIN_EMAIL, ignoreCase = true)
+
+    val isKycVerified: Boolean
+        get() = status.trim().equals("Verified", ignoreCase = true)
 }
 
-@JsonClass(generateAdapter = true)
-data class TransactionRecord(
-    @Json(name = "Date") val date: String = "",
-    @Json(name = "Email") val email: String = "",
-    @Json(name = "Type") val type: String = "",
-    @Json(name = "Amount") val amount: Double = 0.0,
-    @Json(name = "Details") val details: String = "",
-    @Json(name = "Status") val status: String = "Pending",
-    @Json(name = "Proof") val proof: String = "",
-    @Json(name = "_rowNumber") val rowNumber: Int = 0
+data class PlanOption(
+    val name: String = "",
+    val amount: Double = 0.0,
+    val monthlyReturn: Double = 0.0,
+    val totalReturn: Double = 0.0
 )
 
-@JsonClass(generateAdapter = true)
-data class VerificationRecord(
-    @Json(name = "Date") val date: String = "",
-    @Json(name = "Email") val email: String = "",
-    @Json(name = "PAN") val pan: String = "",
-    @Json(name = "Front") val front: String = "",
-    @Json(name = "Back") val back: String = "",
-    @Json(name = "Selfie") val selfie: String = "",
-    @Json(name = "userStatus") val userStatus: String = "Pending",
-    @Json(name = "userName") val userName: String = "",
-    @Json(name = "_rowNumber") val rowNumber: Int = 0
+data class PlansInfo(
+    val ratePercent: Double = 0.0,
+    val period: String = "monthly",
+    val months: Int = 12,
+    val plans: List<PlanOption> = emptyList()
 )
 
-@JsonClass(generateAdapter = true)
-data class UserPlan(
-    @Json(name = "PlanID") val planId: String = "",
-    @Json(name = "UID") val uid: String = "",
-    @Json(name = "Email") val email: String = "",
-    @Json(name = "PlanName") val planName: String = "",
-    @Json(name = "Amount") val amount: Double = 0.0,
-    @Json(name = "Status") val status: String = "",
-    @Json(name = "PaidReturns") val paidReturns: Double = 0.0,
-    @Json(name = "MaxReturns") val maxReturns: Double = 0.0,
-    @Json(name = "Date") val date: String = ""
+data class UserPlanItem(
+    val id: String = "",
+    val name: String = "",
+    val amt: Double = 0.0,
+    val status: String = "",
+    val paid: Int = 0,
+    val max: Int = 0
+) {
+    fun earnedSoFar(ratePercent: Double, period: String): Double {
+        val divisor = if (period.trim().equals("yearly", ignoreCase = true)) 12.0 else 1.0
+        return amt * (ratePercent / 100.0) / divisor * paid
+    }
+}
+
+data class HistoryItem(
+    val date: String = "",
+    val type: String = "",
+    val amount: Double = 0.0,
+    val details: String = "",
+    val status: String = "",
+    val proof: String = ""
 )
 
-@JsonClass(generateAdapter = true)
-data class AppVersionInfo(
-    @Json(name = "latestVersionCode") val latestVersionCode: Int = 1,
-    @Json(name = "latestVersionName") val latestVersionName: String = "1.0",
-    @Json(name = "minVersionCode") val minVersionCode: Int = 1,
-    @Json(name = "forceUpdate") val forceUpdate: Boolean = false,
-    @Json(name = "updateUrl") val updateUrl: String = "",
-    @Json(name = "updateMessage") val updateMessage: String = ""
+data class DepositMethod(
+    val index: Int,
+    val title: String,
+    val address: String,
+    val qrUrl: String
 )
 
-@JsonClass(generateAdapter = true)
-data class ApiResponse<T>(
-    @Json(name = "success") val success: Boolean = false,
-    @Json(name = "message") val message: String = "",
-    @Json(name = "error") val error: String = "",
-    @Json(name = "data") val data: T? = null
+data class WithdrawMethod(
+    val index: Int,
+    val title: String,
+    val helper: String
 )
 
-@JsonClass(generateAdapter = true)
-data class LoginRequest(
-    val action: String = "login",
-    val email: String,
-    val identifier: String = email,
-    val userId: String = email,
-    val password: String
+data class AppSettingsData(
+    val depositMethods: List<DepositMethod> = emptyList(),
+    val withdrawMethods: List<WithdrawMethod> = emptyList(),
+    val raw: Map<String, String> = emptyMap()
 )
 
-@JsonClass(generateAdapter = true)
-data class SignupRequest(
-    val action: String = "signup",
-    val name: String,
-    val email: String,
-    val phone: String,
-    val password: String,
-    val referredBy: String = ""
+data class NotificationItem(
+    val title: String = "",
+    val message: String = "",
+    val date: String = ""
 )
 
-@JsonClass(generateAdapter = true)
-data class SubmitTransactionRequest(
-    val action: String = "submitTransaction",
-    val email: String,
-    val type: String,
-    val amount: Double,
-    val details: String,
-    val proofUrl: String = "",
-    val proofBase64: String = ""
+data class AdminPendingTx(
+    val id: String = "",
+    val email: String = "",
+    val type: String = "",
+    val amount: Double = 0.0,
+    val details: String = "",
+    val proof: String = "",
+    val status: String = ""
 )
 
-@JsonClass(generateAdapter = true)
-data class SubmitKycRequest(
-    val action: String = "submitKyc",
-    val email: String,
-    val pan: String,
-    val frontBase64: String = "",
-    val backBase64: String = "",
-    val selfieBase64: String = "",
-    val frontUrl: String = "",
-    val backUrl: String = "",
-    val selfieUrl: String = ""
+data class AdminPendingKyc(
+    val id: String = "",
+    val email: String = "",
+    val panNo: String = "",
+    val adFront: String = "",
+    val adBack: String = "",
+    val panImg: String = "",
+    val userName: String = "",
+    val userUid: String = "",
+    val userPhone: String = ""
 )
 
-@JsonClass(generateAdapter = true)
-data class UpdateTransactionStatusRequest(
-    val action: String = "updateTransactionStatus",
-    val adminEmail: String,
-    val rowNumber: Int,
-    val status: String
+data class AdminDashboardData(
+    val deps: List<AdminPendingTx> = emptyList(),
+    val withs: List<AdminPendingTx> = emptyList(),
+    val kycs: List<AdminPendingKyc> = emptyList(),
+    val refs: List<AdminPendingTx> = emptyList(),
+    val totalUsers: Int = 0
 )
 
-@JsonClass(generateAdapter = true)
-data class UpdateKycStatusRequest(
-    val action: String = "updateKycStatus",
-    val adminEmail: String,
-    val email: String,
-    val status: String,
-    val notification: String? = null
+data class AdminUserWithPlans(
+    val uid: String = "",
+    val name: String = "",
+    val email: String = "",
+    val plans: List<UserPlanItem> = emptyList()
 )
 
-@JsonClass(generateAdapter = true)
-data class UpdateUserBalanceRequest(
-    val action: String = "updateUserBalance",
-    val adminEmail: String,
-    val email: String,
-    val invested: Double,
-    val totalAmount: Double,
-    val withdrawableLimit: Double,
-    val interestRate: Double,
-    val notification: String
+data class AdminStatsData(
+    val metrics: List<Pair<String, String>> = emptyList()
 )

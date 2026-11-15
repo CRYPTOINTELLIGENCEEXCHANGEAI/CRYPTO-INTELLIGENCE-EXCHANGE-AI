@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.clickable
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,29 +17,46 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,263 +68,507 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import com.example.data.model.TransactionRecord
+import com.example.data.model.AdminDashboardData
+import com.example.data.model.AdminPendingKyc
+import com.example.data.model.AdminPendingTx
+import com.example.data.model.AdminStatsData
+import com.example.data.model.AdminUserWithPlans
 import com.example.data.model.UserProfile
-import com.example.data.model.VerificationRecord
 import com.example.ui.components.EmptyStateCard
-import com.example.ui.components.ProofImageDialog
+import com.example.ui.components.MetricTile
 import com.example.ui.components.StatusBadge
 import com.example.ui.components.formatCurrency
-import com.example.ui.components.formatPercent
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusSuccess
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class AdminSection(val label: String, val icon: ImageVector) {
+    OVERVIEW("Overview", Icons.Default.Dashboard),
+    DEPOSITS("Deposits", Icons.Default.ArrowDownward),
+    WITHDRAWALS("Withdraws", Icons.Default.ArrowUpward),
+    KYC("KYC", Icons.Default.VerifiedUser),
+    REFERRALS("Referrals", Icons.Default.Redeem),
+    USERS("Users", Icons.Default.Group),
+    CREDIT_RETURNS("Returns", Icons.Default.Payments),
+    MANUAL_CREDIT("Credit", Icons.Default.AccountBalanceWallet),
+    NOTIFY("Notify", Icons.Default.Campaign)
+}
+
+private data class PendingConfirmAction(
+    val title: String,
+    val message: String,
+    val onConfirm: () -> Unit
+)
+
 @Composable
 fun AdminScreen(
-    transactions: List<TransactionRecord>,
-    verifications: List<VerificationRecord>,
-    users: List<UserProfile>,
+    isUnlocked: Boolean,
+    isLoading: Boolean,
+    isRefreshing: Boolean,
     isSubmitting: Boolean,
-    onApproveTransaction: (Int) -> Unit,
-    onRejectTransaction: (Int) -> Unit,
-    onApproveKyc: (String) -> Unit,
-    onRejectKyc: (String) -> Unit,
-    onUpdateUserBalance: (
-        email: String,
-        invested: Double,
-        totalAmount: Double,
-        withdrawableLimit: Double,
-        interestRate: Double,
-        notification: String,
-        onDone: () -> Unit
-    ) -> Unit,
+    dashboard: AdminDashboardData,
+    users: List<UserProfile>,
+    usersWithPlans: List<AdminUserWithPlans>,
+    stats: AdminStatsData,
+    onAdminLogin: (adminId: String, adminPass: String) -> Unit,
+    onRefreshAdmin: () -> Unit,
+    onFetchStats: (start: String, end: String) -> Unit,
+    onAdminAction: (type: String, id: String, act: String, email: String, amount: Double) -> Unit,
+    onPayReturn: (uid: String, planId: String) -> Unit,
+    onManualCredit: (uid: String, amount: Double, type: String, onDone: () -> Unit) -> Unit,
+    onSendNotify: (uid: String, title: String, message: String, onDone: () -> Unit) -> Unit,
+    onBack: () -> Unit = {},
+    onLockAdmin: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var previewImagePair by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var editingUser by remember { mutableStateOf<UserProfile?>(null) }
-
-    if (previewImagePair != null) {
-        ProofImageDialog(
-            imageUrl = previewImagePair!!.second,
-            title = previewImagePair!!.first,
-            onDismiss = { previewImagePair = null }
+    if (!isUnlocked) {
+        AdminLoginGate(
+            isLoading = isLoading,
+            onSubmit = onAdminLogin,
+            onBack = onBack,
+            modifier = modifier
         )
+        return
     }
 
-    if (editingUser != null) {
-        EditUserBalanceDialog(
-            user = editingUser!!,
-            isSubmitting = isSubmitting,
-            onSave = { invested, total, limit, interest, notification ->
-                onUpdateUserBalance(
-                    editingUser!!.email,
-                    invested,
-                    total,
-                    limit,
-                    interest,
-                    notification
+    var selectedSectionIdx by remember { mutableIntStateOf(0) }
+    var confirmDialog by remember { mutableStateOf<PendingConfirmAction?>(null) }
+
+    if (confirmDialog != null) {
+        val pending = confirmDialog!!
+        AlertDialog(
+            onDismissRequest = { confirmDialog = null },
+            title = { Text(pending.title) },
+            text = { Text(pending.message) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmDialog = null
+                        pending.onConfirm()
+                    },
+                    enabled = !isSubmitting
                 ) {
-                    editingUser = null
+                    Text("Confirm")
                 }
             },
-            onDismiss = { editingUser = null }
+            dismissButton = {
+                TextButton(onClick = { confirmDialog = null }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 900.dp)
-                .fillMaxSize()
-        ) {
-            PrimaryTabRow(selectedTabIndex = selectedTab) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = {
-                        val pendingCount = transactions.count { it.status.equals("Pending", true) }
-                        Text("Tx ($pendingCount)")
-                    },
-                    modifier = Modifier.testTag("admin_tab_transactions")
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = {
-                        val pendingKyc = verifications.count { it.userStatus.equals("Pending", true) }
-                        Text("KYC ($pendingKyc)")
-                    },
-                    modifier = Modifier.testTag("admin_tab_kyc")
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Balances (${users.size})") },
-                    modifier = Modifier.testTag("admin_tab_balances")
-                )
-            }
+    val sections = AdminSection.entries
+    val currentSection = sections[selectedSectionIdx]
 
-            when (selectedTab) {
-                0 -> AdminTransactionsTab(
-                    transactions = transactions,
-                    isSubmitting = isSubmitting,
-                    onApprove = onApproveTransaction,
-                    onReject = onRejectTransaction,
-                    onPreviewProof = { url -> previewImagePair = "Transaction Proof" to url }
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            // Primary quick-switch bottom tabs + full tab bar above for all 9 sections
+            NavigationBar {
+                val quickTabs = listOf(
+                    AdminSection.OVERVIEW,
+                    AdminSection.DEPOSITS,
+                    AdminSection.WITHDRAWALS,
+                    AdminSection.KYC,
+                    AdminSection.USERS
                 )
-                1 -> AdminKycTab(
-                    verifications = verifications,
-                    isSubmitting = isSubmitting,
-                    onApprove = onApproveKyc,
-                    onReject = onRejectKyc,
-                    onPreviewDoc = { title, url -> previewImagePair = title to url }
-                )
-                2 -> AdminBalancesTab(
-                    users = users,
-                    onEditUser = { user -> editingUser = user }
-                )
+                quickTabs.forEach { sec ->
+                    val idx = sections.indexOf(sec)
+                    NavigationBarItem(
+                        selected = selectedSectionIdx == idx,
+                        onClick = { selectedSectionIdx = idx },
+                        icon = { Icon(sec.icon, contentDescription = sec.label) },
+                        label = { Text(sec.label) }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 920.dp)
+                    .fillMaxSize()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onBack, modifier = Modifier.testTag("admin_back_button")) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Profile")
+                        }
+                        Text(
+                            text = "Admin Console",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = onLockAdmin, modifier = Modifier.testTag("admin_lock_button")) {
+                            Icon(Icons.Default.LockOpen, contentDescription = "Lock Admin Session")
+                        }
+                        IconButton(onClick = onRefreshAdmin) {
+                            if (isRefreshing) {
+                                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = "Refresh Admin Data")
+                            }
+                        }
+                    }
+                }
+
+                ScrollableTabRow(
+                    selectedTabIndex = selectedSectionIdx,
+                    edgePadding = 12.dp
+                ) {
+                    sections.forEachIndexed { index, sec ->
+                        val countBadge = when (sec) {
+                            AdminSection.DEPOSITS -> " (${dashboard.deps.size})"
+                            AdminSection.WITHDRAWALS -> " (${dashboard.withs.size})"
+                            AdminSection.KYC -> " (${dashboard.kycs.size})"
+                            AdminSection.REFERRALS -> " (${dashboard.refs.size})"
+                            AdminSection.USERS -> " (${users.size})"
+                            else -> ""
+                        }
+                        Tab(
+                            selected = selectedSectionIdx == index,
+                            onClick = { selectedSectionIdx = index },
+                            text = { Text("${sec.label}$countBadge") },
+                            modifier = Modifier.testTag("admin_tab_${sec.name.lowercase()}")
+                        )
+                    }
+                }
+
+                when (currentSection) {
+                    AdminSection.OVERVIEW -> AdminOverviewSection(
+                        dashboard = dashboard,
+                        stats = stats,
+                        isLoading = isLoading,
+                        onFetchStats = onFetchStats
+                    )
+                    AdminSection.DEPOSITS -> AdminTxListSection(
+                        items = dashboard.deps,
+                        typeName = "Deposit",
+                        approveAct = "Success",
+                        rejectAct = "Failed",
+                        isSubmitting = isSubmitting,
+                        onRequestAction = { item, act ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "$act Deposit?",
+                                message = "Mark deposit ${formatCurrency(item.amount)} from ${item.email} as $act?",
+                                onConfirm = {
+                                    onAdminAction("Deposit", item.id, act, item.email, item.amount)
+                                }
+                            )
+                        }
+                    )
+                    AdminSection.WITHDRAWALS -> AdminTxListSection(
+                        items = dashboard.withs,
+                        typeName = "Withdraw",
+                        approveAct = "Success",
+                        rejectAct = "Failed",
+                        isSubmitting = isSubmitting,
+                        onRequestAction = { item, act ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "$act Withdrawal?",
+                                message = "Mark withdrawal ${formatCurrency(item.amount)} for ${item.email} as $act?",
+                                onConfirm = {
+                                    onAdminAction("Withdraw", item.id, act, item.email, item.amount)
+                                }
+                            )
+                        }
+                    )
+                    AdminSection.KYC -> AdminKycSection(
+                        items = dashboard.kycs,
+                        isSubmitting = isSubmitting,
+                        onRequestAction = { item, act ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "$act KYC?",
+                                message = "Mark KYC for ${item.userName.ifBlank { item.email }} (${item.panNo}) as $act?",
+                                onConfirm = {
+                                    onAdminAction("KYC", item.id, act, item.email, 0.0)
+                                }
+                            )
+                        }
+                    )
+                    AdminSection.REFERRALS -> AdminTxListSection(
+                        items = dashboard.refs,
+                        typeName = "Referral",
+                        approveAct = "Success",
+                        rejectAct = "Failed",
+                        isSubmitting = isSubmitting,
+                        onRequestAction = { item, act ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "$act Referral Claim?",
+                                message = "Mark referral ${formatCurrency(item.amount)} for ${item.email} as $act?",
+                                onConfirm = {
+                                    onAdminAction("Referral", item.id, act, item.email, item.amount)
+                                }
+                            )
+                        }
+                    )
+                    AdminSection.USERS -> AdminUsersSection(users = users)
+                    AdminSection.CREDIT_RETURNS -> AdminCreditReturnsSection(
+                        usersWithPlans = usersWithPlans,
+                        isSubmitting = isSubmitting,
+                        onRequestPayReturn = { uid, planId, planName ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "Credit Return?",
+                                message = "Pay monthly return for plan $planName (ID: $planId) to UID $uid?",
+                                onConfirm = { onPayReturn(uid, planId) }
+                            )
+                        }
+                    )
+                    AdminSection.MANUAL_CREDIT -> AdminManualCreditSection(
+                        isSubmitting = isSubmitting,
+                        onSubmit = { uid, amount, type, onDone ->
+                            confirmDialog = PendingConfirmAction(
+                                title = "Apply Manual Credit?",
+                                message = "Credit ${formatCurrency(amount)} ($type) to UID $uid?",
+                                onConfirm = { onManualCredit(uid, amount, type, onDone) }
+                            )
+                        }
+                    )
+                    AdminSection.NOTIFY -> AdminNotifySection(
+                        isSubmitting = isSubmitting,
+                        onSubmit = { uid, title, msg, onDone ->
+                            val target = if (uid.isBlank()) "ALL users" else "UID $uid"
+                            confirmDialog = PendingConfirmAction(
+                                title = "Send Notification?",
+                                message = "Send \"$title\" to $target?",
+                                onConfirm = { onSendNotify(uid, title, msg, onDone) }
+                            )
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun AdminTransactionsTab(
-    transactions: List<TransactionRecord>,
-    isSubmitting: Boolean,
-    onApprove: (Int) -> Unit,
-    onReject: (Int) -> Unit,
-    onPreviewProof: (String) -> Unit
+private fun AdminLoginGate(
+    isLoading: Boolean,
+    onSubmit: (String, String) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var pendingOnly by remember { mutableStateOf(true) }
-    val displayList = remember(transactions, pendingOnly) {
-        if (pendingOnly) transactions.filter { it.status.equals("Pending", true) }
-        else transactions
-    }
+    var adminId by remember { mutableStateOf("") }
+    var adminPass by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(20.dp)
+    ) {
+        IconButton(
+            onClick = onBack,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .align(Alignment.TopStart)
+                .testTag("admin_gate_back_button")
         ) {
-            Text(
-                text = "Show Pending Only",
-                style = MaterialTheme.typography.titleSmall
-            )
-            Switch(
-                checked = pendingOnly,
-                onCheckedChange = { pendingOnly = it },
-                modifier = Modifier.testTag("admin_tx_pending_switch")
-            )
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Profile")
         }
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .widthIn(max = 460.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AdminPanelSettings,
+                    contentDescription = "Admin Authentication",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(44.dp)
+                )
+                Text(
+                    text = "Admin Console Unlock",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Enter your Admin ID and Password. Credentials stay in memory for this session only.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = adminId,
+                    onValueChange = { adminId = it },
+                    label = { Text("Admin ID") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("admin_gate_id")
+                )
+                OutlinedTextField(
+                    value = adminPass,
+                    onValueChange = { adminPass = it },
+                    label = { Text("Admin Password") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("admin_gate_pass")
+                )
+                Button(
+                    onClick = { onSubmit(adminId, adminPass) },
+                    enabled = adminId.isNotBlank() && adminPass.isNotBlank() && !isLoading,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("admin_gate_submit")
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                    } else {
+                        Text("Unlock Admin Panel")
+                    }
+                }
+            }
+        }
+    }
+}
 
-        if (displayList.isEmpty()) {
-            Box(modifier = Modifier.padding(16.dp)) {
-                EmptyStateCard(
-                    icon = Icons.Default.ReceiptLong,
-                    title = "No Pending Transactions",
-                    description = "All deposit and withdrawal requests have been reviewed."
+@Composable
+private fun AdminOverviewSection(
+    dashboard: AdminDashboardData,
+    stats: AdminStatsData,
+    isLoading: Boolean,
+    onFetchStats: (start: String, end: String) -> Unit
+) {
+    var startDate by remember { mutableStateOf("") }
+    var endDate by remember { mutableStateOf("") }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MetricTile(
+                    title = "Total Users",
+                    value = dashboard.totalUsers.toString(),
+                    subtitle = "Registered accounts",
+                    icon = Icons.Default.Group,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    title = "Pending Deposits",
+                    value = dashboard.deps.size.toString(),
+                    subtitle = "Awaiting approval",
+                    icon = Icons.Default.ArrowDownward,
+                    modifier = Modifier.weight(1f)
                 )
             }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(displayList, key = { "${it.rowNumber}_${it.date}" }) { tx ->
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                MetricTile(
+                    title = "Pending Withdraws",
+                    value = dashboard.withs.size.toString(),
+                    subtitle = "Payout queue",
+                    icon = Icons.Default.ArrowUpward,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    title = "Pending KYC",
+                    value = dashboard.kycs.size.toString(),
+                    subtitle = "${dashboard.refs.size} referrals pending",
+                    icon = Icons.Default.VerifiedUser,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Date Range Statistics",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = { startDate = it },
+                            label = { Text("Start (YYYY-MM-DD)") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = endDate,
+                            onValueChange = { endDate = it },
+                            label = { Text("End (YYYY-MM-DD)") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Button(
+                        onClick = { onFetchStats(startDate, endDate) },
+                        enabled = !isLoading
+                    ) {
+                        Text("Load Stats")
+                    }
+
+                    stats.metrics.forEach { (key, value) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "${tx.type} • ${formatCurrency(tx.amount)}",
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        text = "${tx.email} • ${tx.date}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                StatusBadge(status = tx.status)
-                            }
-                            if (tx.details.isNotBlank()) {
-                                Text(
-                                    text = tx.details,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (tx.proof.startsWith("http")) {
-                                OutlinedButton(
-                                    onClick = { onPreviewProof(tx.proof) },
-                                    modifier = Modifier.testTag("admin_tx_proof_${tx.rowNumber}")
-                                ) {
-                                    Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Inspect Proof")
-                                }
-                            }
-                            if (tx.status.equals("Pending", true)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Button(
-                                        onClick = { onApprove(tx.rowNumber) },
-                                        enabled = !isSubmitting,
-                                        colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("admin_approve_tx_${tx.rowNumber}")
-                                    ) {
-                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Approve")
-                                    }
-                                    OutlinedButton(
-                                        onClick = { onReject(tx.rowNumber) },
-                                        enabled = !isSubmitting,
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("admin_reject_tx_${tx.rowNumber}")
-                                    ) {
-                                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Reject")
-                                    }
-                                }
-                            }
+                            Text(text = key, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = value,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -316,19 +578,21 @@ private fun AdminTransactionsTab(
 }
 
 @Composable
-private fun AdminKycTab(
-    verifications: List<VerificationRecord>,
+private fun AdminTxListSection(
+    items: List<AdminPendingTx>,
+    typeName: String,
+    approveAct: String,
+    rejectAct: String,
     isSubmitting: Boolean,
-    onApprove: (String) -> Unit,
-    onReject: (String) -> Unit,
-    onPreviewDoc: (String, String) -> Unit
+    onRequestAction: (AdminPendingTx, String) -> Unit
 ) {
-    if (verifications.isEmpty()) {
+    val context = LocalContext.current
+    if (items.isEmpty()) {
         Box(modifier = Modifier.padding(16.dp)) {
             EmptyStateCard(
-                icon = Icons.Default.VerifiedUser,
-                title = "No KYC Submissions",
-                description = "Submitted identity documents will appear here for review."
+                icon = Icons.Default.Check,
+                title = "No Pending ${typeName}s",
+                description = "All $typeName requests have been processed."
             )
         }
         return
@@ -338,7 +602,105 @@ private fun AdminKycTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(verifications, key = { "${it.rowNumber}_${it.email}_${it.date}" }) { ver ->
+        items(items, key = { "${it.id}_${it.email}_${it.amount}" }) { item ->
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "${item.type.ifBlank { typeName }} • ${formatCurrency(item.amount)}",
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${item.email} (ID: ${item.id})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        StatusBadge(status = item.status.ifBlank { "Pending" })
+                    }
+                    if (item.details.isNotBlank()) {
+                        Text(text = item.details, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (item.proof.startsWith("http")) {
+                        TextButton(
+                            onClick = {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.proof)))
+                            }
+                        ) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open Proof Link")
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { onRequestAction(item, approveAct) },
+                            enabled = !isSubmitting,
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Approve")
+                        }
+                        OutlinedButton(
+                            onClick = { onRequestAction(item, rejectAct) },
+                            enabled = !isSubmitting,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Reject")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminKycSection(
+    items: List<AdminPendingKyc>,
+    isSubmitting: Boolean,
+    onRequestAction: (AdminPendingKyc, String) -> Unit
+) {
+    val context = LocalContext.current
+    if (items.isEmpty()) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            EmptyStateCard(
+                icon = Icons.Default.VerifiedUser,
+                title = "No Pending KYCs",
+                description = "All identity verifications have been reviewed."
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(items, key = { "${it.id}_${it.email}_${it.panNo}" }) { item ->
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -349,79 +711,51 @@ private fun AdminKycTab(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = ver.userName.ifBlank { ver.email },
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = "${ver.email} • PAN: ${ver.pan}",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        StatusBadge(status = ver.userStatus)
-                    }
-
+                    Text(
+                        text = "${item.userName.ifBlank { item.email }} (${item.userUid})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Email: ${item.email} • Phone: ${item.userPhone} • PAN: ${item.panNo}",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("Front" to ver.front, "Back" to ver.back, "Selfie" to ver.selfie).forEach { (label, url) ->
+                        listOf("ID Front" to item.adFront, "ID Back" to item.adBack, "Selfie" to item.panImg).forEach { (label, url) ->
                             if (url.startsWith("http")) {
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable { onPreviewDoc("${ver.email} - $label", url) },
-                                    horizontalAlignment = Alignment.CenterHorizontally
+                                OutlinedButton(
+                                    onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    },
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    AsyncImage(
-                                        model = url,
-                                        contentDescription = label,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(72.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                    )
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
+                                    Text(label, maxLines = 1)
                                 }
                             }
                         }
                     }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = { onApprove(ver.email) },
+                            onClick = { onRequestAction(item, "Verified") },
                             enabled = !isSubmitting,
                             colors = ButtonDefaults.buttonColors(containerColor = StatusSuccess),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("admin_verify_kyc_${ver.rowNumber}")
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text("Verify")
+                            Text("Approve")
                         }
                         OutlinedButton(
-                            onClick = { onReject(ver.email) },
+                            onClick = { onRequestAction(item, "Rejected") },
                             enabled = !isSubmitting,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("admin_reject_kyc_${ver.rowNumber}")
+                            modifier = Modifier.weight(1f)
                         ) {
                             Text("Reject")
                         }
@@ -433,86 +767,137 @@ private fun AdminKycTab(
 }
 
 @Composable
-private fun AdminBalancesTab(
-    users: List<UserProfile>,
-    onEditUser: (UserProfile) -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    val filteredUsers = remember(users, searchQuery) {
-        if (searchQuery.isBlank()) users
+private fun AdminUsersSection(users: List<UserProfile>) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(users, query) {
+        if (query.isBlank()) users
         else users.filter {
-            it.name.contains(searchQuery, ignoreCase = true) ||
-                it.email.contains(searchQuery, ignoreCase = true) ||
-                it.userId.contains(searchQuery, ignoreCase = true)
+            it.name.contains(query, true) || it.email.contains(query, true) || it.userId.contains(query, true)
         }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            label = { Text("Search users by name, email, or ID") },
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Search users") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
-                .testTag("admin_user_search_input")
         )
-
-        if (filteredUsers.isEmpty()) {
-            Box(modifier = Modifier.padding(16.dp)) {
-                EmptyStateCard(
-                    icon = Icons.Default.AccountBalanceWallet,
-                    title = "No Users Found",
-                    description = "Try clearing your search filter or refreshing."
-                )
-            }
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(filteredUsers, key = { it.email }) { user ->
-                    Card(
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(filtered, key = { "${it.userId}_${it.email}" }) { u ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onEditUser(user) }
-                            .testTag("admin_user_card_${user.userId}")
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${u.name.ifBlank { u.email }} (${u.userId})",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            StatusBadge(status = u.status)
+                        }
+                        Text(
+                            text = "${u.email} • ${u.phone}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Bal: ${formatCurrency(u.totalAmount)} | Inv: ${formatCurrency(u.invested)} | Lim: ${formatCurrency(u.withdrawableLimit)}",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminCreditReturnsSection(
+    usersWithPlans: List<AdminUserWithPlans>,
+    isSubmitting: Boolean,
+    onRequestPayReturn: (uid: String, planId: String, planName: String) -> Unit
+) {
+    if (usersWithPlans.isEmpty()) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            EmptyStateCard(
+                icon = Icons.Default.Payments,
+                title = "No Users With Active Plans",
+                description = "Users with active plans available for return payouts will appear here."
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(usersWithPlans, key = { "${it.uid}_${it.email}" }) { userItem ->
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${userItem.name} (${userItem.uid})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = userItem.email,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    userItem.plans.forEach { plan ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = user.name.ifBlank { user.email },
-                                    style = MaterialTheme.typography.titleMedium
+                                    text = "${plan.name} • ${formatCurrency(plan.amt)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "${user.email} • ${user.userId}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Bal: ${formatCurrency(user.totalAmount)} | Inv: ${formatCurrency(user.invested)} | Lim: ${formatCurrency(user.withdrawableLimit)} | ${formatPercent(user.interestRate)}",
+                                    text = "ID: ${plan.id} • Paid: ${plan.paid}/${plan.max} (${plan.status})",
                                     fontFamily = JetBrainsMonoFontFamily,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit user balance",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            Button(
+                                onClick = { onRequestPayReturn(userItem.uid, plan.id, plan.name) },
+                                enabled = !isSubmitting
+                            ) {
+                                Text("Credit return")
+                            }
                         }
                     }
                 }
@@ -522,85 +907,120 @@ private fun AdminBalancesTab(
 }
 
 @Composable
-private fun EditUserBalanceDialog(
-    user: UserProfile,
+private fun AdminManualCreditSection(
     isSubmitting: Boolean,
-    onSave: (invested: Double, totalAmount: Double, withdrawableLimit: Double, interestRate: Double, notification: String) -> Unit,
-    onDismiss: () -> Unit
+    onSubmit: (uid: String, amount: Double, type: String, onDone: () -> Unit) -> Unit
 ) {
-    var invested by remember(user) { mutableStateOf(user.invested.toString()) }
-    var totalAmount by remember(user) { mutableStateOf(user.totalAmount.toString()) }
-    var withdrawableLimit by remember(user) { mutableStateOf(user.withdrawableLimit.toString()) }
-    var interestRate by remember(user) { mutableStateOf(user.interestRate.toString()) }
-    var notification by remember(user) { mutableStateOf(user.notification) }
+    var uid by remember { mutableStateOf("") }
+    var amountText by remember { mutableStateOf("") }
+    val types = listOf("Deposit", "Bonus", "Return", "Limit")
+    var selectedType by remember { mutableStateOf(types.first()) }
+    val amount = amountText.toDoubleOrNull() ?: 0.0
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit ${user.name.ifBlank { user.email }}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = invested,
-                    onValueChange = { invested = it },
-                    label = { Text("Invested Amount") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.testTag("admin_edit_invested")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(text = "Manual Credit", style = MaterialTheme.typography.titleLarge)
+        OutlinedTextField(
+            value = uid,
+            onValueChange = { uid = it },
+            label = { Text("Target User ID (UID)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = amountText,
+            onValueChange = { amountText = it },
+            label = { Text("Credit Amount") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            types.forEach { t ->
+                FilterChip(
+                    selected = selectedType == t,
+                    onClick = { selectedType = t },
+                    label = { Text(t) }
                 )
-                OutlinedTextField(
-                    value = totalAmount,
-                    onValueChange = { totalAmount = it },
-                    label = { Text("Total Balance (Total Amount)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.testTag("admin_edit_total")
-                )
-                OutlinedTextField(
-                    value = withdrawableLimit,
-                    onValueChange = { withdrawableLimit = it },
-                    label = { Text("Withdrawable Limit") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.testTag("admin_edit_limit")
-                )
-                OutlinedTextField(
-                    value = interestRate,
-                    onValueChange = { interestRate = it },
-                    label = { Text("Interest (%)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.testTag("admin_edit_interest")
-                )
-                OutlinedTextField(
-                    value = notification,
-                    onValueChange = { notification = it },
-                    label = { Text("Dashboard Notification") },
-                    maxLines = 2,
-                    modifier = Modifier.testTag("admin_edit_notification")
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        invested.toDoubleOrNull() ?: user.invested,
-                        totalAmount.toDoubleOrNull() ?: user.totalAmount,
-                        withdrawableLimit.toDoubleOrNull() ?: user.withdrawableLimit,
-                        interestRate.toDoubleOrNull() ?: user.interestRate,
-                        notification.trim()
-                    )
-                },
-                enabled = !isSubmitting,
-                modifier = Modifier.testTag("admin_save_balance_button")
-            ) {
-                Text("Save to Sheet")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
             }
         }
-    )
+        Button(
+            onClick = {
+                onSubmit(uid, amount, selectedType) {
+                    uid = ""
+                    amountText = ""
+                }
+            },
+            enabled = uid.isNotBlank() && amount > 0.0 && !isSubmitting,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Text("Apply Credit")
+        }
+    }
+}
+
+@Composable
+private fun AdminNotifySection(
+    isSubmitting: Boolean,
+    onSubmit: (uid: String, title: String, message: String, onDone: () -> Unit) -> Unit
+) {
+    var uid by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text(text = "Send Notification", style = MaterialTheme.typography.titleLarge)
+        OutlinedTextField(
+            value = uid,
+            onValueChange = { uid = it },
+            label = { Text("Target UID (leave empty for all users)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Notification Title") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = message,
+            onValueChange = { message = it },
+            label = { Text("Message") },
+            minLines = 3,
+            maxLines = 5,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Button(
+            onClick = {
+                onSubmit(uid, title, message) {
+                    uid = ""
+                    title = ""
+                    message = ""
+                }
+            },
+            enabled = title.isNotBlank() && message.isNotBlank() && !isSubmitting,
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Text("Send Notification")
+        }
+    }
 }

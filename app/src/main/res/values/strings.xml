@@ -1,12 +1,4 @@
 <resources>
-    <string name="app_name">Crypto Intelligence Exchange</string>
+    <string name="app_name">Crypto Intelligence AI</string>
     <string name="tagline">Crypto Intelligence Exchange AI</string>
-    <string name="login_title">Welcome Back</string>
-    <string name="signup_title">Create Investor Account</string>
-    <string name="nav_dashboard">Dashboard</string>
-    <string name="nav_transfer">Transact</string>
-    <string name="nav_kyc">KYC</string>
-    <string name="nav_history">History</string>
-    <string name="nav_admin">Admin</string>
-    <string name="error_no_endpoint">Configure your Google Apps Script Web App URL to connect your Google Sheet.</string>
 </resources>

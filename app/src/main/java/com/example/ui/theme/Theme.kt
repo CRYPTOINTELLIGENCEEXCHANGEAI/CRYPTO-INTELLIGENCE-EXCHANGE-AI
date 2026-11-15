@@ -12,36 +12,37 @@ import androidx.compose.ui.unit.dp
 
 private val DarkColorScheme = darkColorScheme(
     primary = EmeraldAccent,
-    onPrimary = ObsidianBackground,
+    onPrimary = MatteBlackBackground,
     primaryContainer = EmeraldDeep,
     onPrimaryContainer = EmeraldSoft,
-    secondary = GoldChampagne,
-    onSecondary = ObsidianBackground,
-    secondaryContainer = GoldDeep,
-    onSecondaryContainer = GoldMuted,
-    tertiary = EmeraldSoft,
-    background = ObsidianBackground,
+    secondary = ExchangeYellow,
+    onSecondary = MatteBlackBackground,
+    secondaryContainer = ExchangeYellowDeep,
+    onSecondaryContainer = ExchangeYellowSoft,
+    tertiary = ExchangeYellowSoft,
+    onTertiary = MatteBlackBackground,
+    background = MatteBlackBackground,
     onBackground = IvoryText,
-    surface = ObsidianSurface,
+    surface = MatteBlackSurface,
     onSurface = IvoryText,
-    surfaceVariant = ObsidianSurfaceVariant,
+    surfaceVariant = MatteBlackSurfaceVariant,
     onSurfaceVariant = MutedSlateText,
-    outline = OutlineDark,
+    outline = MatteBlackOutline,
     error = StatusError,
     onError = Color.White,
     errorContainer = StatusErrorContainer
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = EmeraldDeep,
+    primary = EmeraldPrimary,
     onPrimary = Color.White,
     primaryContainer = EmeraldTint,
     onPrimaryContainer = EmeraldDeep,
-    secondary = GoldChampagne,
+    secondary = ExchangeYellow,
     onSecondary = ObsidianText,
-    secondaryContainer = GoldMuted,
-    onSecondaryContainer = GoldDeep,
-    tertiary = EmeraldPrimary,
+    secondaryContainer = ExchangeYellowSoft,
+    onSecondaryContainer = ExchangeYellowDeep,
+    tertiary = EmeraldAccent,
     background = IvoryBackground,
     onBackground = ObsidianText,
     surface = PureSurface,
@@ -51,7 +52,7 @@ private val LightColorScheme = lightColorScheme(
     outline = OutlineSubtle,
     error = StatusError,
     onError = Color.White,
-    errorContainer = StatusErrorContainer
+    errorContainer = Color(0xFFFEE2E2)
 )
 
 val AppShapes = Shapes(
@@ -63,7 +64,7 @@ val AppShapes = Shapes(
 
 @Composable
 fun MyFundGlobalTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

@@ -57,7 +57,7 @@ import com.example.ui.components.StatusBadge
 fun KycScreen(
     user: UserProfile,
     isSubmitting: Boolean,
-    onSubmitKyc: (pan: String, frontUri: Uri?, backUri: Uri?, selfieUri: Uri?, onDone: () -> Unit) -> Unit,
+    onSubmitKyc: (panNum: String, frontUri: Uri, backUri: Uri, selfieUri: Uri, onDone: () -> Unit) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var panNumber by remember { mutableStateOf("") }
@@ -75,8 +75,9 @@ fun KycScreen(
         if (uri != null) selfieUri = uri
     }
 
-    val isAlreadyVerified = user.status.equals("Verified", ignoreCase = true)
-    val isPending = user.status.equals("Pending", ignoreCase = true)
+    val isVerified = user.isKycVerified
+    val isUnderReview = user.status.equals("Under Review", ignoreCase = true) ||
+        user.status.equals("Pending", ignoreCase = true)
 
     Box(
         modifier = modifier.fillMaxSize(),
@@ -90,7 +91,6 @@ fun KycScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // KYC Header Card with generated shield artwork
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -112,18 +112,19 @@ fun KycScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Identity Verification",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "KYC Verification",
+                            style = MaterialTheme.typography.titleLarge
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         StatusBadge(status = user.status)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = when {
-                                isAlreadyVerified -> "Your account is fully verified for withdrawals."
-                                isPending -> "Documents received and awaiting admin approval."
-                                else -> "Upload your PAN, Government ID front/back, and a clear selfie."
+                                isVerified -> "Your KYC is verified. Withdrawals are unlocked."
+                                isUnderReview -> "Your documents are currently under review."
+                                user.status.equals("Rejected", ignoreCase = true) ->
+                                    "Your previous submission was rejected. Please re-upload clear photos."
+                                else -> "Upload your PAN number, ID Front, ID Back, and a Selfie."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -132,11 +133,11 @@ fun KycScreen(
                 }
             }
 
-            if (!isAlreadyVerified) {
+            if (!isVerified) {
                 OutlinedTextField(
                     value = panNumber,
                     onValueChange = { panNumber = it.uppercase() },
-                    label = { Text("PAN / Tax ID Number") },
+                    label = { Text("PAN Number") },
                     placeholder = { Text("ABCDE1234F") },
                     leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null) },
                     singleLine = true,
@@ -178,7 +179,7 @@ fun KycScreen(
                 }
 
                 DocumentPickerTile(
-                    label = "Live Selfie Photo",
+                    label = "Selfie Photo",
                     uri = selfieUri,
                     icon = Icons.Default.CameraAlt,
                     onClick = {
@@ -199,7 +200,7 @@ fun KycScreen(
 
                 Button(
                     onClick = {
-                        onSubmitKyc(panNumber, frontUri, backUri, selfieUri) {
+                        onSubmitKyc(panNumber, frontUri!!, backUri!!, selfieUri!!) {
                             panNumber = ""
                             frontUri = null
                             backUri = null
@@ -220,10 +221,7 @@ fun KycScreen(
                             modifier = Modifier.size(22.dp)
                         )
                     } else {
-                        Text(
-                            text = if (isPending) "Re-submit KYC Documents" else "Submit for Verification",
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                        Text("Submit KYC")
                     }
                 }
             }
@@ -276,8 +274,7 @@ private fun DocumentPickerTile(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
@@ -292,8 +289,7 @@ private fun DocumentPickerTile(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.labelLarge
                 )
                 Text(
                     text = "Tap to select",

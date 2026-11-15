@@ -1,8 +1,9 @@
 package com.example.ui.components
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,31 +18,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -50,7 +43,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.data.model.AppVersionInfo
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusErrorContainer
@@ -58,6 +50,8 @@ import com.example.ui.theme.StatusPending
 import com.example.ui.theme.StatusPendingContainer
 import com.example.ui.theme.StatusSuccess
 import com.example.ui.theme.StatusSuccessContainer
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -77,9 +71,9 @@ fun StatusBadge(
 ) {
     val normalized = status.trim().lowercase()
     val (bgColor, fgColor, icon) = when {
-        normalized == "verified" || normalized == "success" || normalized == "active" || normalized == "approved" ->
+        normalized in listOf("verified", "success", "active", "approved", "completed") ->
             Triple(StatusSuccessContainer, StatusSuccess, Icons.Default.CheckCircle)
-        normalized == "pending" ->
+        normalized in listOf("pending", "under review", "in review", "processing") ->
             Triple(StatusPendingContainer, StatusPending, Icons.Default.HourglassTop)
         else ->
             Triple(StatusErrorContainer, StatusError, Icons.Default.ErrorOutline)
@@ -102,7 +96,7 @@ fun StatusBadge(
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
-                text = status.ifBlank { "Unverified" },
+                text = status.ifBlank { "Not Verified" },
                 color = fgColor,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -234,52 +228,6 @@ fun EmptyStateCard(
 }
 
 @Composable
-fun UpdatePromptDialog(
-    versionInfo: AppVersionInfo,
-    onUpdateNow: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = { if (!versionInfo.forceUpdate) onDismiss() },
-        icon = {
-            Icon(
-                imageVector = Icons.Default.SystemUpdate,
-                contentDescription = "App Update Available",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        },
-        title = {
-            Text(text = "Update Available (v${versionInfo.latestVersionName})")
-        },
-        text = {
-            Text(
-                text = versionInfo.updateMessage.ifBlank {
-                    "A new version of MyFund Global is ready. Update now for the latest features and security patches."
-                }
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = { onUpdateNow(versionInfo.updateUrl) },
-                modifier = Modifier.testTag("update_now_button")
-            ) {
-                Text("Download Update")
-            }
-        },
-        dismissButton = {
-            if (!versionInfo.forceUpdate) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.testTag("update_later_button")
-                ) {
-                    Text("Later")
-                }
-            }
-        }
-    )
-}
-
-@Composable
 fun ProofImageDialog(
     imageUrl: String,
     title: String,
@@ -311,61 +259,46 @@ fun ProofImageDialog(
 }
 
 @Composable
-fun EndpointConfigDialog(
-    currentUrl: String,
-    onSave: (String) -> Unit,
-    onDismiss: () -> Unit
+fun QrCodeDisplay(
+    address: String,
+    qrUrl: String,
+    modifier: Modifier = Modifier
 ) {
-    var urlText by remember(currentUrl) { mutableStateOf(currentUrl) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = if (currentUrl.isNotBlank()) Icons.Default.CloudDone else Icons.Default.CloudOff,
-                contentDescription = "Apps Script Backend",
-                tint = MaterialTheme.colorScheme.primary
-            )
-        },
-        title = { Text("Google Sheets API Endpoint") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Paste your deployed Google Apps Script Web App URL (ends with /exec) to connect live to your Google Sheet.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedTextField(
-                    value = urlText,
-                    onValueChange = { urlText = it },
-                    label = { Text("Apps Script Web App URL") },
-                    placeholder = { Text("https://script.google.com/macros/s/.../exec") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("endpoint_url_input")
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(urlText.trim())
-                    onDismiss()
-                },
-                enabled = urlText.trim().startsWith("https://"),
-                modifier = Modifier.testTag("save_endpoint_button")
-            ) {
-                Text("Save Endpoint")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.testTag("cancel_endpoint_button")
-            ) {
-                Text("Cancel")
+    if (qrUrl.startsWith("http")) {
+        AsyncImage(
+            model = qrUrl,
+            contentDescription = "Payment QR code",
+            contentScale = ContentScale.Fit,
+            modifier = modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .padding(6.dp)
+        )
+    } else if (address.isNotBlank()) {
+        val bitmap = remember(address) {
+            try {
+                val size = 360
+                val matrix = QRCodeWriter().encode(address, BarcodeFormat.QR_CODE, size, size)
+                val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+                for (x in 0 until size) {
+                    for (y in 0 until size) {
+                        bmp.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                    }
+                }
+                bmp
+            } catch (_: Exception) {
+                null
             }
         }
-    )
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Generated deposit QR code",
+                modifier = modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White)
+                    .padding(8.dp)
+            )
+        }
+    }
 }

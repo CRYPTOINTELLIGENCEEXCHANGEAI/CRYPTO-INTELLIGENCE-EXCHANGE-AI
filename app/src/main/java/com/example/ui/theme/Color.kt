@@ -2,38 +2,48 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Emerald Brand Palette
-val EmeraldDeep = Color(0xFF083E30)
-val EmeraldPrimary = Color(0xFF0B5340)
+// Primary Exchange Green Palette
+val EmeraldDeep = Color(0xFF063325)
+val EmeraldPrimary = Color(0xFF0B6B4B)
 val EmeraldAccent = Color(0xFF10B981)
-val EmeraldSoft = Color(0xFFD1FAE5)
-val EmeraldTint = Color(0xFFEAF6F1)
+val EmeraldSoft = Color(0xFFA7F3D0)
+val EmeraldTint = Color(0xFFE6F7F0)
 
-// Luxury Gold Accents
-val GoldChampagne = Color(0xFFD4AF37)
-val GoldMuted = Color(0xFFF6E7B4)
-val GoldDeep = Color(0xFF7A5B00)
+// Electric / Warm Yellow Accents
+val ExchangeYellow = Color(0xFFFACC15)
+val ExchangeYellowSoft = Color(0xFFFEF08A)
+val ExchangeYellowDeep = Color(0xFF423600)
 
-// Neutral Surfaces - Light
-val IvoryBackground = Color(0xFFF5F7F6)
+// Backward-compatible aliases referencing the Yellow accent palette
+val GoldChampagne = ExchangeYellow
+val GoldMuted = ExchangeYellowSoft
+val GoldDeep = ExchangeYellowDeep
+
+// Neutral Surfaces - Matte Black (Primary App Surface System)
+val MatteBlackBackground = Color(0xFF0A0D0B)
+val MatteBlackSurface = Color(0xFF131815)
+val MatteBlackSurfaceVariant = Color(0xFF1B231E)
+val MatteBlackOutline = Color(0xFF2B3A31)
+
+val ObsidianBackground = MatteBlackBackground
+val ObsidianSurface = MatteBlackSurface
+val ObsidianSurfaceVariant = MatteBlackSurfaceVariant
+val IvoryText = Color(0xFFF3F6F4)
+val MutedSlateText = Color(0xFF9CAFA4)
+val OutlineDark = MatteBlackOutline
+
+// Neutral Surfaces - Light fallback
+val IvoryBackground = Color(0xFFF4F7F5)
 val PureSurface = Color(0xFFFFFFFF)
-val SlateSurfaceVariant = Color(0xFFE7ECEA)
-val ObsidianText = Color(0xFF0F172A)
-val SlateSecondaryText = Color(0xFF475569)
-val OutlineSubtle = Color(0xFFCBD5E1)
-
-// Neutral Surfaces - Dark
-val ObsidianBackground = Color(0xFF091210)
-val ObsidianSurface = Color(0xFF111E1A)
-val ObsidianSurfaceVariant = Color(0xFF192B25)
-val IvoryText = Color(0xFFF1F5F9)
-val MutedSlateText = Color(0xFF94A3B8)
-val OutlineDark = Color(0xFF263B34)
+val SlateSurfaceVariant = Color(0xFFE6ECE8)
+val ObsidianText = Color(0xFF0D1511)
+val SlateSecondaryText = Color(0xFF475B51)
+val OutlineSubtle = Color(0xFFC8D5CE)
 
 // Semantic Status Colors
-val StatusSuccess = Color(0xFF059669)
-val StatusSuccessContainer = Color(0xFFD1FAE5)
-val StatusPending = Color(0xFFD97706)
-val StatusPendingContainer = Color(0xFFFEF3C7)
-val StatusError = Color(0xFFDC2626)
-val StatusErrorContainer = Color(0xFFFEE2E2)
+val StatusSuccess = Color(0xFF10B981)
+val StatusSuccessContainer = Color(0xFF0D3326)
+val StatusPending = Color(0xFFFACC15)
+val StatusPendingContainer = Color(0xFF332B05)
+val StatusError = Color(0xFFEF4444)
+val StatusErrorContainer = Color(0xFF3B1214)
